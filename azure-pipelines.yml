@@ -1,48 +1,43 @@
-# ASP.NET
-# Build and test ASP.NET projects.
-# Add steps that publish symbols, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/apps/aspnet/build-aspnet-4
-
 trigger:
-- main
+- '*'
 
 pool:
-  name: 'default'
+  vmImage: ubuntu-latest
 
 variables:
-  solution: '**/*.sln'
-  buildPlatform: 'Any CPU'
   buildConfiguration: 'Release'
 
 steps:
 - task: UseDotNet@2
   displayName: 'Use .NET SDK 6.x'
   inputs:
-    packageType: 'sdk'
+    packageType: sdk
     version: '6.x'
 
+- task: Npm@1
+  displayName: 'Run npm install'
+  inputs:
+    verbose: false
+
+- script: './node_modules/.bin/node-sass Tailspin.SpaceGame.Web/wwwroot --output Tailspin.SpaceGame.Web/wwwroot'
+  displayName: 'Compile Sass assets'
+
+- task: gulp@1
+  displayName: 'Run gulp tasks'
+
+- script: 'echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt'
+  displayName: 'Write build info'
+  workingDirectory: Tailspin.SpaceGame.Web/wwwroot
 
 - task: DotNetCoreCLI@2
   displayName: 'Restore project dependencies'
   inputs:
     command: 'restore'
     projects: '**/*.csproj'
-    feedsToUse: 'select'
 
-- template: templates/build.yml
-  parameters:
-    buildConfiguration: Debug
-
-- template: templates/build.yml
-  parameters:
-    buildConfiguration: Release
-
-- task: PublishBuildArtifacts@1
-  displayName: 'Publish Artifact: drop'
+- task: DotNetCoreCLI@2
+  displayName: 'Build the project - Release'
   inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    ArtifactName: 'drop'
-    publishLocation: 'Container'
-- task: WhiteSource@21
-  inputs:
-    cwd: '$(System.DefaultWorkingDirectory)'
+    command: 'build'
+    arguments: '--no-restore --configuration Release'
+    projects: '**/*.csproj'
